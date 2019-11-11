@@ -14,39 +14,6 @@ from nltk.tokenize import sent_tokenize, word_tokenize
 
 from utilities import punctuation, key_tags
 
-page_offset = 11
-symptom_title = "What to Look for"
-search_word = "Burns"
-specific_term = "Chemical"
-
-def proto_parser(): 
-
-    path = "../data/FA-CPR-AED-Part-Manual.pdf"
-    pdf_file = open(path, "rb")
-    pdf_file = PyPDF2.PdfFileReader(pdf_file)
-    reference_pages = [5,6,7]
-    search_word = "Burns"
-    for page_num in reference_pages:
-        page = pdf_file.getPage(page_num)
-        page_text = page.extractText()
-        search_word_index = page_text.find(search_word)
-        if search_word_index != -1:
-            following_text = page_text[search_word_index: search_word_index + 50].split()
-            section_numbers = []
-            for text in following_text:
-                if text.isdigit():
-                    section_numbers.append(int(text) + page_offset)
-                if len(section_numbers) > 2: 
-                    break
-    for page_num in range(section_numbers[0], section_numbers[1]+ 1):
-        page = pdf_file.getPage(page_num)
-        page_text = page.extractText()
-        search_term = specific_term + " " + search_word
-        specific_index = page_text.find(search_term)
-        if specific_index != -1:
-            pass
-
-
 class parser():
 
     bucket = "first-aid-data"
