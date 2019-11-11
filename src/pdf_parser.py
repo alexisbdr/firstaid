@@ -163,11 +163,5 @@ class parser():
         steps = self.extract_steps(text_sentences)
 
         
-
-  
-
-                 
-
-        
 if __name__ == "__main__":
     parser("Burns", "Chemical")
