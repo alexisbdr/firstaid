@@ -12,7 +12,7 @@ from nltk import PorterStemmer
 from nltk.corpus import stopwords
 from nltk.tokenize import sent_tokenize, word_tokenize
 
-from utilities import punctuation, key_tags
+from utilities import punctuation, key_tags, LinkedList
 
 class parser():
 
@@ -59,7 +59,7 @@ class parser():
     def convert_sentence_to_step(self, sentence: str, tagged_sentence: (str, str)) -> str: 
         
         #sentence_stopped = self.remove_stop_words(sentence)
-        print(sentence)
+        sentence = sentence.replace('\r', '').replace('\n', '')
         return sentence
 
     def find_page_numbers_by_category(self, pdf_file):
@@ -74,7 +74,7 @@ class parser():
                 section_numbers = []
                 for text in following_text:
                     if text.isdigit():
-                        section_numbers.append(int(text) + page_offset)
+                        section_numbers.append(int(text) + self.page_offset)
                     if len(section_numbers) == 2:
                         return section_numbers
 
@@ -103,10 +103,6 @@ class parser():
                     sentences = sent_tokenize(extracted_chunk)
                     return sentences
 
-    def check_tags(self, tag: (str, str), tag_index: int) -> bool: 
-
-        return None
-    
     def extract_steps(self, sentences: str, num_steps: int = 4):
         steps = []
         for sentence in sentences:
@@ -118,7 +114,8 @@ class parser():
                     and tag_index >= key_tags[tag]["start"] \
                     and tag_index <= key_tags[tag]["end"]:
                     filtered_detection = self.convert_sentence_to_step(sentence, tagged_words)
-                    steps.append(filtered_detection)
+                    if filtered_detection not in steps:
+                        steps.append(filtered_detection)
         return steps
 
                         
@@ -127,8 +124,13 @@ class parser():
         pdf_file = PyPDF2.PdfFileReader(pdf)
         pages = self.find_page_numbers_by_category(pdf_file)
         text_sentences = self.find_section_in_page(pdf_file, pages)
-        steps = self.extract_steps(text_sentences)
+        self.steps = self.extract_steps(text_sentences)
 
-        
+    def to_linked_list(self) -> LinkedList:
+        ll = LinkedList() #Initialize with nothing in the LL
+        for step in self.steps:
+            ll.insert(step)
+        ll.printList()
+
 if __name__ == "__main__":
-    parser("Burns", "Chemical")
+    parser("Burns", "Chemical").to_linked_list()

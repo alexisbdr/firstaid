@@ -42,16 +42,19 @@ class Node:
         self.next = next_node
     
 class LinkedList: 
-    def __int__(self, head=None):
+    def __init__(self, head=None):
         self.head = head
         self.tail = None
         self.count = 0
 
     def insert(self, data):
         #We want to insert at back of linked list
-        self.count+=1
+        self.count += 1
         new_node = Node(self.count, data)
-        if not self.tail:
+        if not self.head: 
+            self.head = new_node
+        elif not self.tail:
+            self.head.set_next(new_node)
             self.tail = new_node 
         else: 
             self.tail.set_next(new_node)
@@ -88,5 +91,5 @@ class LinkedList:
     def printList(self):
         temp = self.head
         while temp: 
-            print(temp.data)
-            temp = temp.next
+            print(temp.get_data())
+            temp = temp.get_next()
