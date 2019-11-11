@@ -93,3 +93,11 @@ class LinkedList:
         while temp: 
             print(temp.get_data())
             temp = temp.get_next()
+    
+    def getList(self):
+        temp = self.head 
+        llist = []
+        while temp:
+            llist.append(temp.get_data())
+            temp = temp.get_next()
+        return llist

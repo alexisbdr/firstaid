@@ -11,6 +11,7 @@ import nltk
 from nltk import PorterStemmer
 from nltk.corpus import stopwords
 from nltk.tokenize import sent_tokenize, word_tokenize
+nltk.data.path.append("./nltk_data")
 
 from utilities import punctuation, key_tags, LinkedList
 
@@ -117,8 +118,6 @@ class parser():
                     if filtered_detection not in steps:
                         steps.append(filtered_detection)
         return steps
-
-                        
             
     def parse_pdf(self, pdf):
         pdf_file = PyPDF2.PdfFileReader(pdf)
@@ -130,7 +129,4 @@ class parser():
         ll = LinkedList() #Initialize with nothing in the LL
         for step in self.steps:
             ll.insert(step)
-        ll.printList()
-
-if __name__ == "__main__":
-    parser("Burns", "Chemical").to_linked_list()
+        return ll

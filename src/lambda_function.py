@@ -31,15 +31,16 @@ def handle(event, context):
 
     global count
     
-    """
-    Example use of the pdf Parser
-    #Make sure to capitalize first letter of the words
-    steps_from_pdf = parser("Burns", "Chemical")
-    """
+
+    #Example use of the pdf Parser
+    #Make sure to capitalize first letter of the words + That they correspond to something in the pdf
+    steps_from_pdf = parser("Burns", "Chemical").to_linked_list()
+    speak = steps_from_pdf.getList()
+    #steps from_pdf is a linked list - look at the structure in utilities to figure out how to parse it
 
     if event['request']['type']=="LaunchRequest":
       count = 0
-      spokenMsg = "<speak>" + str(count)+ "What injury do you have?</speak>"
+      spokenMsg = "<speak>" + str(speak) + "</speak>"
       return {"version": "1.0", "sessionAttributes": {}, "response": {"outputSpeech":{"type":"SSML","ssml":spokenMsg},"reprompt": {"outputSpeech": { "type": "SSML", "ssml": "<speak>Please describe the injury.</speak>" }}, "shouldEndSession":False}}
     
  #   if "error" in event.keys():
@@ -66,12 +67,12 @@ def handle(event, context):
         
       
       elif intentName=="GDAHelp" or intentName=="AMAZON.HelpIntent":
-        return sendHelp();
+        return sendHelp()
 
       elif intentName in unsupportedPlaybackIntents:
         spokenMsg = "<speak>I can't do that with <w role=\"ivona:NN\">live</w> games.<p>I can help you with your favorite team's stats, schedule, and standings.</p> What can I help you with?</speak>"
         return {"version": "1.0", "sessionAttributes": {}, "response": {"outputSpeech":{"type":"SSML","ssml":spokenMsg}, "reprompt": {"outputSpeech": { "type": "SSML", "ssml": "<speak>You can ask me to play a live game, or you can ask about your favorite team’s stats, schedule, and more. What would you like?</speak>" }}, "shouldEndSession":False}}
-
+    """
       elif intentName=="AMAZON.ResumeIntent":
         if isAudioPlayerPlaying(event):
           return resumePlayingGame(event)
@@ -97,7 +98,7 @@ def handle(event, context):
         
       else:
         return sendHelp()
-
+    """
 
 
     #handle when we get a recognized intent from either our defined or the Amazon set of utterances
