@@ -18,7 +18,11 @@ from utilities import punctuation, key_tags, LinkedList
 class parser():
 
     bucket = "first-aid-data"
-    key = "FA-CPR-AED-Part-Manual.pdf"
+    key = {
+        "default": "FA-CPR-AED-Part-Manual.pdf",
+        "army": "Army-First-Aid.pdf",
+        "everything": "Everything-First-Aid.pdf"
+    }
     download_path = '../data/'+key
 
     index_pages = [5,6,7]
@@ -130,3 +134,4 @@ class parser():
         for step in self.steps:
             ll.insert(step)
         return ll
+

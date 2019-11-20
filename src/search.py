@@ -1,7 +1,6 @@
 # Fast Implementation of a search module
 import urllib
 import requests
-import googlesearch
 
 class search: 
     

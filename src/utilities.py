@@ -1,3 +1,5 @@
+import json
+
 punctuation = [",",".",";"]
 key_tags = {
     "MD": { #Modal e.g "should", "could"
@@ -42,6 +44,7 @@ class Node:
         self.next = next_node
     
 class LinkedList: 
+    
     def __init__(self, head=None):
         self.head = head
         self.tail = None
@@ -101,3 +104,11 @@ class LinkedList:
             llist.append(temp.get_data())
             temp = temp.get_next()
         return llist
+    
+    def to_json(self) -> str:
+        return json.dumps(self.getList)
+    
+    def from_json(self, json: str):
+        ll_list = json.loads(json)
+        for node in ll_list:
+            self.insert(node)
