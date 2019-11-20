@@ -23,7 +23,7 @@ class parser():
         "army": "Army-First-Aid.pdf",
         "everything": "Everything-First-Aid.pdf"
     }
-    download_path = '../data/'+key
+    download_path = '../data/' + key["default"]
 
     index_pages = [5,6,7]
     page_offset = 11
@@ -37,7 +37,7 @@ class parser():
     
     def get_file(self):
         if not path.exists(self.download_path):
-            self.download_path = "/tmp/" + self.key
+            self.download_path = self.download_path + self.key["default"]
             try:
                 self.s3_client.download_file(self.bucket, self.key, self.download_path)
             except ClientError as e : 
@@ -98,6 +98,7 @@ class parser():
             "{} {}".format(self.sub_category, self.category),
             "{} {}".format(self.category, self.sub_category)
         ]
+        sentences = []
         for page_num in range(pages[0], pages[1]+ 1):
             page = pdf_file.getPage(page_num)
             page_text = page.extractText()
@@ -105,8 +106,14 @@ class parser():
                 section_index = page_text.find(search_term)
                 if section_index != -1:
                     extracted_chunk = page_text[section_index: section_index + 2000]
-                    sentences = sent_tokenize(extracted_chunk)
-                    return sentences
+                    sentences.extend(sent_tokenize(extracted_chunk))
+                    #Then get start of next page if we didn't get enough
+                    if len(extracted_chunk) < 700:
+                        next_page = pdf_file.getPage(page_num + 1)
+                        next_page_text = next_page.extractText()
+                        next_extracted_chunk = next_page_text[0: 2000 - len(extracted_chunk)]
+                        sentences.extend(sent_tokenize(next_extracted_chunk))
+        return sentences
 
     def extract_steps(self, sentences: str, num_steps: int = 4):
         steps = []
@@ -125,9 +132,10 @@ class parser():
             
     def parse_pdf(self, pdf):
         pdf_file = PyPDF2.PdfFileReader(pdf)
-        pages = self.find_page_numbers_by_category(pdf_file)
-        text_sentences = self.find_section_in_page(pdf_file, pages)
-        self.steps = self.extract_steps(text_sentences)
+        self.pages = self.find_page_numbers_by_category(pdf_file)
+        self.text_sentences = self.find_section_in_page(pdf_file, self.pages)
+        self.steps = self.extract_steps(self.text_sentences)
+        return self.steps
 
     def to_linked_list(self) -> LinkedList:
         ll = LinkedList() #Initialize with nothing in the LL
@@ -135,3 +143,5 @@ class parser():
             ll.insert(step)
         return ll
 
+if __name__ == "__main__":
+    print(parser("Burns", "Heat (Thermal)").steps)
