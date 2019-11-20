@@ -1,20 +1,22 @@
 # Fast Implementation of a search module
 import urllib
 import requests
+import googlesearch
+from bs4 import BeautifulSoup
 
 class search: 
     
     url_prefix = "https://www."
     types_mapping = {
         "definitions": {
-            "medical": ["merriam-webster.com/medical/{}"],
-            "general": ["merriam-webster.com/dictionary/{}", "wikipedia.com/{}"] 
+            "medical": ["merriam-webster.com/medical/"],
+            "general": ["merriam-webster.com/dictionary/", "wikipedia.org/wiki/"] 
         },
         "images": ["google.com/imghp?hl=en&search={}&num=10"],
         "flash_cards": [],
         "default": ["google.com/search?q={}&num=10&hl=en"]
     }
-    def __init__(self, search_term: str, types: str, category: str = ""): 
+    def __init__(self, search_term, types, category): 
         self.search_term = search_term
         if types in self.types_mapping:
             self.mappings = self.types_mapping[types]
@@ -27,8 +29,9 @@ class search:
 
     def search(self):
         for mapping in self.mappings:
-            search_url = self.url_prefix + mapping
+            search_url = self.url_prefix + mapping + self.search_term
             resp = requests.get(search_url)
+            print(search_url)
             print(resp)
             #Do response handling here... -->
             if resp.status_code == 404: 
@@ -36,4 +39,4 @@ class search:
         
 
 if __name__ == "__main__": 
-    search("cough", "definitions", "medical")
+    search("cough", "images", "general")
