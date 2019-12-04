@@ -117,11 +117,12 @@ class parser():
         ##TODO make better search method that iteratively goes through until we find some sort of section
         ## what does a section consist of
         search_terms = [
-            "{} {}".format(self.sub_category, self.category),
+            "{}{}".format(self.sub_category, self.category),
             "{} {}".format(self.category, self.sub_category)
         ]
         sentences = []
-        pages = [119, 125]
+        pages = [73, 77]
+        print(search_terms)
         for page_num in range(pages[0], pages[-1]+ 1):
             page = pdf_file.getPage(page_num)
             page_text = page.extractText()
@@ -137,6 +138,17 @@ class parser():
                         next_extracted_chunk = next_page_text[0: 2000 - len(extracted_chunk)]
                         sentences.extend(sent_tokenize(next_extracted_chunk))
         return sentences
+
+    def filter_figure(self, tagged_words: List):
+        """
+        Filter out any FIGURE tags
+        """
+        [tagged_words.pop(i+1) for i, tag in enumerate(tagged_words) if\
+            tag[0] == "FIGURE" and tagged_words[i+1][1] in ["CD", "JJ"]]
+        [tagged_words.pop(i) for i, tag in enumerate(tagged_words) if tag[0] == "FIGURE"]
+        [tagged_words.pop(i) for i, tag in enumerate(tagged_words) if tag[0] == "Fig"]
+        
+        return tagged_words
 
     def make_action(self, tagged_words: List):
         """
@@ -185,6 +197,8 @@ class parser():
         Gets a sentence string as an input and a list of tagged_words and key tags
         """
         print(tagged_words)
+        tagged_words = self.filter_figure(tagged_words)
+        print(tagged_words)
         #Check for a conditional -- any interogative inside of sentence
         for index, tag in enumerate(tagged_words): 
             if tag[0] == "If" and tag[1] == "IN":
@@ -195,8 +209,11 @@ class parser():
                 #Find first comma and stop the question there
                 conditional_parts = conditional.split(",")
                 question = conditional_parts[0] + "?"
-                comma_index = tagged_words.index((",",","))
-                print(tagged_words)
+                try: 
+                    comma_index = tagged_words.index((",",","))
+                except ValueError:
+                    self.steps.insert(question)
+                    return
                 print(comma_index)
                 tagged_words = tagged_words[comma_index + 1:]
                 explanation_steps = self.extract_explanations(tagged_words)
@@ -232,12 +249,12 @@ class parser():
             words = word_tokenize(sentence)
             tagged_words = nltk.pos_tag(words)
             for tag_index, tag in enumerate(tagged_words):
-                if tag[1] in key_tags and \
-                    tag_index >= key_tags[tag[1]]["start"] and \
-                        tag_index <= key_tags[tag[1]]["end"]:
-                    self.parse_step_from_sentence(tagged_words) #
+                #if tag[1] in key_tags and \
+                #    tag_index >= key_tags[tag[1]]["start"] and \
+                #        tag_index <= key_tags[tag[1]]["end"]:
+                self.parse_step_from_sentence(tagged_words) #
                     #We break because once we've found a key tag we just go through regardless
-                    break
+                break
             
     def parse_pdf(self, pdf):
         pdf_file = PyPDF2.PdfFileReader(pdf)
@@ -252,4 +269,4 @@ class parser():
         return ll
 
 if __name__ == "__main__":
-    print(parser("Injuries", "Lip").steps.to_json())
+    print(parser("Caring for a Conscious Choking Infant", "").steps.to_json())
