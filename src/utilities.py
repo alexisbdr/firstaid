@@ -154,7 +154,7 @@ class LinkedList:
         return llist
     
     def to_json(self) -> str:
-        return json.dumps(self.getList)
+        return json.dumps(self.getList())
     
     def from_json(self, json: str):
         ll_list = json.loads(json)

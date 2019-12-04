@@ -4,7 +4,6 @@ import typing
 from typing import List
 from os import path
 from itertools import count
-from itertools import groupy
 
 import boto3
 from botocore.exceptions import ClientError
@@ -137,12 +136,28 @@ class parser():
                         sentences.extend(sent_tokenize(next_extracted_chunk))
         return sentences
 
+    def extract_explanations(self, tagged_words: List):
+        """
+        There can be multiple explanations after a question or explanations that to not relate
+        to the given question, try to separate
+        those out into separate nodes 
+        """
+        conj_separator = [i for i,tag in enumerate(tagged_words) if tag[0] == "and" and \
+            tagged_words[i+1][1] == "VB"]
+        if conj_separator:
+            explanation_tags = [tagged_words[i+1 : j] for i, j in zip([0] + \
+                conj_separator, conj_separator + [None])] 
+            return [" ".join([t[0] for t in explanation]) for \
+                explanation in explanation_tags]
+        else:
+            return [" ".join([t[0] for t in tagged_words])]
+
     def interrogative_to_question(self, tagged_words:List):
         """
         Given an interrogative sentence attempts to convert it to a question
         """
         #Get the VBD tagged word from the tagged words list
-        aux_verbs = [tag[0] for i, tag in tagged_words if tag[1] == "VBD"]
+        aux_verbs = [i for i, tag in enumerate(tagged_words) if tag[1] == "VBD"]
         if aux_verbs: 
             tagged_words.insert(0, tagged_words.pop(aux_verbs[0]))
         else: 
@@ -150,25 +165,34 @@ class parser():
         print(tagged_words)
         return " ".join([t[0] for t in tagged_words])
         
-    def parse_step_from_sentence(self, sentence: str, tagged_words: List) -> str: 
+    def parse_step_from_sentence(self, tagged_words: List) -> str: 
         """
         Gets a sentence string as an input and a list of tagged_words and key tags
         """
-        print(sentence, "\n", tagged_words)
-        sentence_list = sentence.replace('\r', '').replace('\n', '').split()
         #Check for a conditional -- any interogative inside of sentence
         for index, tag in enumerate(tagged_words): 
             if tag[0] == "If" and tag[1] == "IN":
-                #Make the start of the interrogative sentence a question 
-                conditional = self.interrogative_to_question(tagged_words[index:])
+                #Make the start of the interrogative sentence a question
+                tagged_words = tagged_words[index + 1:] 
+                conditional = self.interrogative_to_question(tagged_words)
+                print(conditional)
                 #Find first comma and stop the question there
                 conditional_parts = conditional.split(",")
                 question = conditional_parts[0] + "?"
-                print(question)
-                explanation = " ".join(conditional_parts[1:])
-                self.steps.insert_conditional(question)
-                self.steps.insert(explanation)
-                
+                comma_index = tagged_words.index((",",","))
+                print(tagged_words)
+                print(comma_index)
+                tagged_words = tagged_words[comma_index + 1:]
+                explanation_steps = self.extract_explanations(tagged_words)
+                print(explanation_steps)
+                self.steps.insert_conditional(question, explanation_steps[0])
+                [self.steps.insert(explanation) for explanation in explanation_steps[1:]]
+                return
+        sentence_list = " ".join(t[0] for t in tagged_words).replace("\n", "").replace("\r", "")
+        print(sentence_list)        
+        self.steps.insert(sentence_list)
+
+        """ 
         for sentence_tag in key_tags:
             index, tag = sentence_tag[0], sentence_tag[1]
             #Special case2: if ":" take what's after
@@ -178,10 +202,7 @@ class parser():
             for i in range(min(0,index - 8), max(index+1,len(sentence_list))):
                 if tagged_words[i][1] in key_tags[tag]["after"] and i != len(sentence_list) - 1:
                     sentence_list = sentence_list[index:]
-        
-        sentence = " ".join(sentence_list)
-        
-        return sentence
+        """
 
     def extract_steps(self, sentences: str, num_steps: int = 4):
         """
@@ -198,7 +219,7 @@ class parser():
                 if tag[1] in key_tags and \
                     tag_index >= key_tags[tag[1]]["start"] and \
                         tag_index <= key_tags[tag[1]]["end"]:
-                    self.parse_step_from_sentence(sentence, tagged_words)) #
+                    self.parse_step_from_sentence(tagged_words) #
                     #We break because once we've found a key tag we just go through regardless
                     break
             
@@ -206,7 +227,7 @@ class parser():
         pdf_file = PyPDF2.PdfFileReader(pdf)
         self.pages = self.find_page_numbers_by_category(pdf_file)
         self.text_sentences = self.find_section_in_page(pdf_file, self.pages)
-        self.steps = self.extract_steps(self.text_sentences)
+        self.extract_steps(self.text_sentences)
 
     def to_linked_list(self) -> LinkedList:
         ll = LinkedList() #Initialize with nothing in the LL
@@ -215,4 +236,4 @@ class parser():
         return ll
 
 if __name__ == "__main__":
-    print(parser("Burns", "Chemical").steps)
+    print(parser("Burns", "Chemical").steps.to_json())
