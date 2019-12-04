@@ -101,8 +101,9 @@ class parser():
                 for text in following_text:
                     if text.isdigit():
                         section_numbers.append(int(text) + self.page_offset)
-                    if len(section_numbers) == 2:
+                    if len(section_numbers) == 7:
                         return section_numbers
+                return section_numbers
 
     def find_section_in_page(self, pdf_file, pages: List[int]) -> str: 
         
@@ -120,7 +121,8 @@ class parser():
             "{} {}".format(self.category, self.sub_category)
         ]
         sentences = []
-        for page_num in range(pages[0], pages[1]+ 1):
+        pages = [119, 125]
+        for page_num in range(pages[0], pages[-1]+ 1):
             page = pdf_file.getPage(page_num)
             page_text = page.extractText()
             for search_term in search_terms:
@@ -135,6 +137,19 @@ class parser():
                         next_extracted_chunk = next_page_text[0: 2000 - len(extracted_chunk)]
                         sentences.extend(sent_tokenize(next_extracted_chunk))
         return sentences
+
+    def make_action(self, tagged_words: List):
+        """
+        Convert any sentence into an action
+        """
+        max_posn = 4
+        action_verb = [i for i,tag in enumerate(tagged_words) if tag[1] == "VB" and \
+            any(x[0] for x in tagged_words[:i] if x[1] == "MD")]
+        print(action_verb)
+        if action_verb:
+            action_sent = tagged_words[action_verb[0]:]
+            return " ".join([t[0] for t in action_sent])
+        return " ".join([t[0] for t in tagged_words])
 
     def extract_explanations(self, tagged_words: List):
         """
@@ -169,6 +184,7 @@ class parser():
         """
         Gets a sentence string as an input and a list of tagged_words and key tags
         """
+        print(tagged_words)
         #Check for a conditional -- any interogative inside of sentence
         for index, tag in enumerate(tagged_words): 
             if tag[0] == "If" and tag[1] == "IN":
@@ -188,9 +204,9 @@ class parser():
                 self.steps.insert_conditional(question, explanation_steps[0])
                 [self.steps.insert(explanation) for explanation in explanation_steps[1:]]
                 return
-        sentence_list = " ".join(t[0] for t in tagged_words).replace("\n", "").replace("\r", "")
-        print(sentence_list)        
-        self.steps.insert(sentence_list)
+        final = self.make_action(tagged_words) 
+        #sentence_list = " ".join(t[0] for t in tagged_words).replace("\n", "").replace("\r", "")
+        self.steps.insert(final)
 
         """ 
         for sentence_tag in key_tags:
@@ -236,4 +252,4 @@ class parser():
         return ll
 
 if __name__ == "__main__":
-    print(parser("Burns", "Chemical").steps.to_json())
+    print(parser("Injuries", "Lip").steps.to_json())
