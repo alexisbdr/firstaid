@@ -1,8 +1,6 @@
 # Fast Implementation of a search module
 import urllib
 import requests
-import googlesearch
-from bs4 import BeautifulSoup
 
 class search: 
     

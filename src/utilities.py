@@ -6,23 +6,47 @@ key_tags = {
         "start": 0, 
         "end": 5,
         "before": "",
-        "after": ""
+        "after": [""]
     },
     ":": { #Colon, want to catch anything after - could be an explanation
         "start": 0, 
         "end": float('inf'),
-        "before": "",
-        "after": ""
+        "before": [":"],
+        "after": [":"]
     },
     "VB" : { #Verb at the start of sentence could indicate action
         "start": 0, 
         "end": 1, 
         "before": "",
-        "after": punctuation[1]
+        "after": [punctuation[1], "MD"]
     }
 }
 
+class ConditionalNode: 
+
+    def __init__(self, num=None, data=None, next_node = None, conditional_node=None):
+        self.id = num
+        self.data = data
+        self.conditional_next = conditional_node
+        self.next = next_node
+
+    def get_data(self):
+        return self.data
+    
+    def get_conditional(self):
+        return self.conditional_next
+    
+    def get_next(self):
+        return self.next
+    
+    def set_next(self, next_node):
+        self.next = next_node
+    
+    def set_conditional_next(self, conditional):
+        self.conditional_next = conditional
+
 class Node:
+
     def __init__(self, num = None, data = None, next_node = None):
         self.id = num
         self.data = data
@@ -53,14 +77,36 @@ class LinkedList:
     def insert(self, data):
         #We want to insert at back of linked list
         self.count += 1
-        new_node = Node(self.count, data)
+        new_node = Node(num=self.count, data=data)
         if not self.head: 
             self.head = new_node
         elif not self.tail:
             self.head.set_next(new_node)
+            if isinstance(self.head, ConditionalNode):
+                self.head.get_conditional().set_next(new_node)
             self.tail = new_node 
         else: 
             self.tail.set_next(new_node)
+            if isinstance(self.tail, ConditionalNode):
+                self.tail.get_conditional().set_next(new_node)
+            self.tail = new_node
+    
+    def insert_conditional(self, data, conditional):
+        self.count += 1
+        new_node = ConditionalNode(num=self.count, data=data)
+        conditional = Node(num=self.count, data=conditional)
+        new_node.set_conditional_next(conditional)
+        if not self.head:
+            self.head = new_node
+        elif not self.tail:
+            self.head.set_next(new_node)
+            if isinstance(self.head, ConditionalNode):
+                self.head.get_conditional().set_next(new_node)
+            self.tail = new_node
+        else: 
+            self.tail.set_next(new_node)
+            if isinstance(self.tail, ConditionalNode):
+                self.tail.get_conditional().set_next(new_node)
             self.tail = new_node
     
     def find(self, number, data = None):
@@ -102,6 +148,8 @@ class LinkedList:
         llist = []
         while temp:
             llist.append(temp.get_data())
+            if isinstance(temp, ConditionalNode):
+                llist.append(temp.get_conditional().get_data())
             temp = temp.get_next()
         return llist
     

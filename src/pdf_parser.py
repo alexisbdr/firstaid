@@ -3,6 +3,8 @@ import json
 import typing
 from typing import List
 from os import path
+from itertools import count
+from itertools import groupy
 
 import boto3
 from botocore.exceptions import ClientError
@@ -28,25 +30,50 @@ class parser():
     index_pages = [5,6,7]
     page_offset = 11
 
+    procedures_table = "First_Aid-Procedures"
+
     def __init__(self, category: str, sub_category: str): 
         self.category = category
         self.sub_category = sub_category
         self.s3_client = boto3.client('s3')
-        pdf = self.get_file()
-        self.parse_pdf(pdf)
+        self.db_client = boto3.resource('dynamodb')
+        self.get_steps()
     
-    def get_file(self):
-        if not path.exists(self.download_path):
-            self.download_path = self.download_path + self.key["default"]
-            try:
-                self.s3_client.download_file(self.bucket, self.key, self.download_path)
-            except ClientError as e : 
-                raise Exception("Download problem", e)
+    def get_steps(self):
+        if not self.get_steps_from_db(): 
+            if not path.exists(self.download_path):
+                self.download_path = "/tmp/" + self.key["default"]
+                try:
+                    self.s3_client.download_file(self.bucket, self.key, self.download_path)
+                except ClientError as e : 
+                    raise Exception("Download problem", e)
+            try: 
+                pdf_file = open(self.download_path, 'rb')
+                self.parse_pdf(pdf_file)
+            except IOError as e:
+                raise Exception("Failed to open file", e)
+
+        
+    def get_steps_from_db(self) -> bool:
         try: 
-            pdf_file = open(self.download_path, 'rb')
-        except IOError as e:
-            raise Exception("Failed to open file", e)
-        return pdf_file
+            table = self.db_client.Table(self.procedures_table)
+            response = table.get_item(
+                Key={
+                    'Name': "{} {}".format(self.sub_category, self.category)
+                }
+            )
+        except ClientError as e: 
+            return False
+        else: 
+            try: 
+                item = response["Item"]
+                print(item)
+                self.steps = item["Steps"]
+                print("worked")
+                return True
+            except ValueError as e: 
+                return False
+            return False
 
     def find_word_association(self, word: str):
         stemmer = PorterStemmer()
@@ -61,12 +88,7 @@ class parser():
                 clean_text.remove(token)
         return " ".join(clean_text)
     
-    def convert_sentence_to_step(self, sentence: str, tagged_sentence: (str, str)) -> str: 
-        
-        #sentence_stopped = self.remove_stop_words(sentence)
-        sentence = sentence.replace('\r', '').replace('\n', '')
-        return sentence
-
+    
     def find_page_numbers_by_category(self, pdf_file):
         #get similar category word
         #stemmed = self.find_word_association(self.category)
@@ -115,27 +137,76 @@ class parser():
                         sentences.extend(sent_tokenize(next_extracted_chunk))
         return sentences
 
+    def interrogative_to_question(self, tagged_words:List):
+        """
+        Given an interrogative sentence attempts to convert it to a question
+        """
+        #Get the VBD tagged word from the tagged words list
+        aux_verbs = [tag[0] for i, tag in tagged_words if tag[1] == "VBD"]
+        if aux_verbs: 
+            tagged_words.insert(0, tagged_words.pop(aux_verbs[0]))
+        else: 
+            tagged_words.insert(0, ("did", "VBD"))
+        print(tagged_words)
+        return " ".join([t[0] for t in tagged_words])
+        
+    def parse_step_from_sentence(self, sentence: str, tagged_words: List) -> str: 
+        """
+        Gets a sentence string as an input and a list of tagged_words and key tags
+        """
+        print(sentence, "\n", tagged_words)
+        sentence_list = sentence.replace('\r', '').replace('\n', '').split()
+        #Check for a conditional -- any interogative inside of sentence
+        for index, tag in enumerate(tagged_words): 
+            if tag[0] == "If" and tag[1] == "IN":
+                #Make the start of the interrogative sentence a question 
+                conditional = self.interrogative_to_question(tagged_words[index:])
+                #Find first comma and stop the question there
+                conditional_parts = conditional.split(",")
+                question = conditional_parts[0] + "?"
+                print(question)
+                explanation = " ".join(conditional_parts[1:])
+                self.steps.insert_conditional(question)
+                self.steps.insert(explanation)
+                
+        for sentence_tag in key_tags:
+            index, tag = sentence_tag[0], sentence_tag[1]
+            #Special case2: if ":" take what's after
+            #Special case1: Check for VB at start of se (within first 4)
+            
+            #Check that the tag is after a specified key and update the sentence
+            for i in range(min(0,index - 8), max(index+1,len(sentence_list))):
+                if tagged_words[i][1] in key_tags[tag]["after"] and i != len(sentence_list) - 1:
+                    sentence_list = sentence_list[index:]
+        
+        sentence = " ".join(sentence_list)
+        
+        return sentence
+
     def extract_steps(self, sentences: str, num_steps: int = 4):
-        steps = []
+        """
+        New Approach: 
+        start adding to linked list as soon as you find a step
+        """
+        self.steps = LinkedList()
+        step_count = count(0)
+
         for sentence in sentences:
             words = word_tokenize(sentence)
             tagged_words = nltk.pos_tag(words)
-            for tag_index in range(len(tagged_words)):
-                tag = tagged_words[tag_index][1]
-                if tag in key_tags \
-                    and tag_index >= key_tags[tag]["start"] \
-                    and tag_index <= key_tags[tag]["end"]:
-                    filtered_detection = self.convert_sentence_to_step(sentence, tagged_words)
-                    if filtered_detection not in steps:
-                        steps.append(filtered_detection)
-        return steps
+            for tag_index, tag in enumerate(tagged_words):
+                if tag[1] in key_tags and \
+                    tag_index >= key_tags[tag[1]]["start"] and \
+                        tag_index <= key_tags[tag[1]]["end"]:
+                    self.parse_step_from_sentence(sentence, tagged_words)) #
+                    #We break because once we've found a key tag we just go through regardless
+                    break
             
     def parse_pdf(self, pdf):
         pdf_file = PyPDF2.PdfFileReader(pdf)
         self.pages = self.find_page_numbers_by_category(pdf_file)
         self.text_sentences = self.find_section_in_page(pdf_file, self.pages)
         self.steps = self.extract_steps(self.text_sentences)
-        return self.steps
 
     def to_linked_list(self) -> LinkedList:
         ll = LinkedList() #Initialize with nothing in the LL
@@ -144,4 +215,4 @@ class parser():
         return ll
 
 if __name__ == "__main__":
-    print(parser("Burns", "Heat (Thermal)").steps)
+    print(parser("Burns", "Chemical").steps)

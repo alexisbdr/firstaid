@@ -14,6 +14,8 @@ from search import search
 print('Loading function')
 
 
+#TODO: Maybe add a repeat this step function
+
 def lambda_handler(event, context):
     
     #try:
@@ -47,15 +49,18 @@ def handle(event, context):
         intentName = event['request']['intent']['name']
       
         if intentName=="BurnIntent":
-            steps_from_pdf = parser("Burns", "Chemical").to_linked_list()
-            speak = steps_from_pdf.getList()
+            speak = getInjury('Burns')
             
             print(isNewUser(event, speak))
             uploadSessionInjury(event, speak)
             spokenMsg = "<speak>" +str(speak[0])+" </speak>"
             return {"version": "1.0", "sessionAttributes": {}, "response": {"outputSpeech":{"type":"SSML","ssml":spokenMsg},"reprompt": {"outputSpeech": { "type": "SSML", "ssml": "<speak>Please describe your injury.</speak>" }}, "shouldEndSession":False}}
 
-        elif intentName == "NextIntent":
+        elif intentName == "YesIntent":
+            spokenMsg = "<speak>" + str(getConditionalNext(event))+ "</speak>"
+            return {"version": "1.0", "sessionAttributes": {}, "response": {"outputSpeech":{"type":"SSML","ssml":spokenMsg},"reprompt": {"outputSpeech": { "type": "SSML", "ssml": "<speak>Please describe your injury.</speak>" }}, "shouldEndSession":False}}
+
+        elif intentName == "NextIntent" or intentName == "NoIntent":
             spokenMsg = "<speak>" + str(getNextStep(event))+ "</speak>"
             return {"version": "1.0", "sessionAttributes": {}, "response": {"outputSpeech":{"type":"SSML","ssml":spokenMsg},"reprompt": {"outputSpeech": { "type": "SSML", "ssml": "<speak>Please describe your injury.</speak>" }}, "shouldEndSession":False}}
 
@@ -190,7 +195,7 @@ def uploadSessionInjury(event, injury):
     #print(json.dumps(response))
 
 
-def getNextStep(event):
+def getNextStep(event): #is also conditional No (goes to default_next)
     dynamodb = boto3.resource('dynamodb')
     table = dynamodb.Table('First_Aid-Sessions')
     try:
@@ -202,23 +207,51 @@ def getNextStep(event):
     else:
         item = response['Item']
 
-        if len(item['Steps'])-1 <= item['Current_Step']:
+        if int(item['Steps'][item['Current_Step']]['default_next']) == -1:
             return "You have reached the end of the first aid procedure. If you need, you can start over or listen to the previous step."
         else:
 
             response = table.update_item(Key = {'User_Session':str(event['session']['user']['userId'])},
                                          UpdateExpression="set Current_Step=:c",
                                          ExpressionAttributeValues={
-                                             ':c': int(item['Current_Step'])+1
+                                             ':c': int(item['Steps'][item['Current_Step']]['default_next'])
                                              },
                                          ReturnValues="UPDATED_NEW")
             
             print("GetItem succeeded:")
             #print(json.dumps(item))
             
-            return item['Steps'][int(item['Current_Step'])+1]
+            return item['Steps'][int(item['Steps'][item['Current_Step']]['default_next'])]["Speak"]
 
-def getPreviousStep(event):
+def getConditionalNext(event):
+    dynamodb = boto3.resource('dynamodb')
+    table = dynamodb.Table('First_Aid-Sessions')
+    try:
+        response = table.get_item(
+            Key={
+                'User_Session': event['session']['user']['userId']})
+    except ClientError as e:
+        print(e.response['Error']['Message'])
+    else:
+        item = response['Item']
+
+        if int(item['Steps'][item['Current_Step']]['conditional_next']) == -1:
+            return getNextStep(event)
+        else:
+
+            response = table.update_item(Key = {'User_Session':str(event['session']['user']['userId'])},
+                                         UpdateExpression="set Current_Step=:c",
+                                         ExpressionAttributeValues={
+                                             ':c': int(item['Steps'][item['Current_Step']]['conditional_next'])
+                                             },
+                                         ReturnValues="UPDATED_NEW")
+            
+            print("GetItem succeeded:")
+            #print(json.dumps(item))
+            
+            return item['Steps'][int(item['Steps'][item['Current_Step']]['conditional_next'])]["Speak"]
+
+def getPreviousStep(event): 
     dynamodb = boto3.resource('dynamodb')
     table = dynamodb.Table('First_Aid-Sessions')
     try:
@@ -244,7 +277,7 @@ def getPreviousStep(event):
             print("GetItem succeeded:")
             #print(json.dumps(item))
             
-            return item['Steps'][int(item['Current_Step'])-1]
+            return item['Steps'][int(item['Current_Step'])-1]["Speak"]
 
 def repeatStep(event):
     dynamodb = boto3.resource('dynamodb')
@@ -257,7 +290,7 @@ def repeatStep(event):
         print(e.response['Error']['Message'])
     else:
         item = response['Item']
-        return item['Steps'][int(item['Current_Step'])]
+        return item['Steps'][int(item['Current_Step'])]["Speak"]
 
 def startOver(event):
     dynamodb = boto3.resource('dynamodb')
@@ -277,9 +310,21 @@ def startOver(event):
                                          },
                                      ReturnValues="UPDATED_NEW")
         
-        return item['Steps'][0]
+        return item['Steps'][0]["Speak"]
     
 
+def getInjury(injury_text):
+    dynamodb = boto3.resource('dynamodb')
+    table = dynamodb.Table('First_Aid-Procedures')
+    try:
+        response = table.get_item(
+            Key={
+                "Name" : injury_text})
+    except ClientError as e:
+        print(e.response['Error']['Message'])
+    else:
+        item = response['Item']
+        return item['Steps']
 
 def sendHelp():
   alexaOutputSpeech = "<speak>Please describe in a few words your injury.</speak>"
