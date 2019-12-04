@@ -12,7 +12,7 @@ class search:
             "medical": ["merriam-webster.com/medical/"],
             "general": ["merriam-webster.com/dictionary/"]
         },
-        "images": ["google.com/search?tbm=isch&num=10&q="],
+        "images": ["google.com/search?tbm=isch&num=1&q="],
         "flash_cards": [],
         "videos": ["youtube.com/results?search_query="],
         "default": ["google.com/search?q={}&num=10&hl=en"]
@@ -27,7 +27,9 @@ class search:
                 self.mappings = self.mappings[category]
         else:
             self.mappings = self.types_mapping["default"]
-        self.search(types)
+
+        self.result = self.search(types)
+        #self.search(types)
 
     def search(self, types):
         results = []
@@ -50,18 +52,37 @@ class search:
                 dLine = dLine.replace(': ', '', 1)
                 results.append(dLine)
         elif types == "images":
-            for a in soup.find_all("div", {"class": "rg_meta"}):
-                link = json.loads(a.text)["ou"]
-                results.append(link)
+            #images = soup.findAll("div", {"class": "rg_meta"})
+            
+            url_start = str(soup).find("\"ou\":\"")+6
+            
+            url_end = str(soup).find("?", url_start)
+            if url_end == -1:
+                url_end = str(soup).find("\",", url_start)
+
+            is_ended = str(soup).find("\",", url_start)
+            if is_ended != -1:
+                url_end = str(soup).find("\",", url_start)
+            
+            photo = str(soup)[url_start:url_end]
+            print(photo)
+            results.append(photo)
+            
+            #results.append(json.loads(soup.find("div", {"class": "rg_meta"}).text)["ou"])
+            #for a in soup.find_all("div", {"class": "rg_meta"}):
+            #    link = json.loads(a.text)["ou"]
+            #    results.append(link)
         elif types == "videos":
-            videos = soup.findAll('a', attrs={'class': 'yt-uix-tile-link'})
-            for v in videos:
-                tmp = 'https://www.youtube.com' + v['href']
-                results.append(tmp)
+##            videos = soup.findAll('a', attrs={'class': 'yt-uix-tile-link'})
+##            for v in videos:
+##                tmp = 'https://www.youtube.com' + v['href']
+##                results.append(tmp)
+            video = soup.find('a', attrs={'class': 'yt-uix-tile-link'})
+            results.append('https://www.youtube.com' + video['href'])
         for result in results:
             print(result)
         return results
 
 
 if __name__ == "__main__":
-    search("bandage", "videos", "general")
+    search("cpr diagram", "images", "general")

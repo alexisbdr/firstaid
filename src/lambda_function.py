@@ -53,9 +53,25 @@ def handle(event, context):
             
             print(isNewUser(event, speak))
             uploadSessionInjury(event, speak)
-            spokenMsg = "<speak>" +str(speak[0])+" </speak>"
+            spokenMsg = "<speak>" +str(speak[0]["Speak"])+" </speak>"
             return {"version": "1.0", "sessionAttributes": {}, "response": {"outputSpeech":{"type":"SSML","ssml":spokenMsg},"reprompt": {"outputSpeech": { "type": "SSML", "ssml": "<speak>Please describe your injury.</speak>" }}, "shouldEndSession":False}}
 
+        elif intentName == "ChokingIntent":
+            speak = getInjury('Choking')
+            print(isNewUser(event, speak))
+            uploadSessionInjury(event,speak)
+            spekenMsg = "<speak>" +str(speak[0]["Speak"])+" </speak>"
+            return {"version": "1.0", "sessionAttributes": {}, "response": {"outputSpeech":{"type":"SSML","ssml":spokenMsg},"reprompt": {"outputSpeech": { "type": "SSML", "ssml": "<speak>Please describe your injury.</speak>" }}, "shouldEndSession":False}}
+
+        elif intentName == "FaceInjuryIntent":
+            speak = getInjury('Injuries')
+            print(isNewUser(event, speak))
+            uploadSessionInjury(event,speak)
+            spekenMsg = "<speak>" +str(speak[0]["Speak"])+" </speak>"
+            return {"version": "1.0", "sessionAttributes": {}, "response": {"outputSpeech":{"type":"SSML","ssml":spokenMsg},"reprompt": {"outputSpeech": { "type": "SSML", "ssml": "<speak>Please describe your injury.</speak>" }}, "shouldEndSession":False}}
+
+        
+            
         elif intentName == "YesIntent":
             spokenMsg = "<speak>" + str(getConditionalNext(event))+ "</speak>"
             return {"version": "1.0", "sessionAttributes": {}, "response": {"outputSpeech":{"type":"SSML","ssml":spokenMsg},"reprompt": {"outputSpeech": { "type": "SSML", "ssml": "<speak>Please describe your injury.</speak>" }}, "shouldEndSession":False}}
@@ -77,9 +93,31 @@ def handle(event, context):
             return {"version": "1.0", "sessionAttributes": {}, "response": {"outputSpeech":{"type":"SSML","ssml":spokenMsg},"reprompt": {"outputSpeech": { "type": "SSML", "ssml": "<speak>Please describe your injury.</speak>" }}, "shouldEndSession":False}}
             
         elif intentName == "DetailIntent":
-            spokenMsg = "<speak>" + "Let me show you more information about the last step on your phone."
+            term_to_define = event['request']['intent']['slots']['DefineTerm']['value']           
+            #spokenMsg = "<speak>" + "Let me show you more information about the last step on your phone." +"</speak>"
+            defined_term = search(term_to_define, "definitions", "general").result[0]
+            print(defined_term)
+            spokenMsg = "<speak>" + term_to_define +" is defined as: " + str(defined_term) +"</speak>"
             return {"version": "1.0", "sessionAttributes": {}, "response": {"outputSpeech":{"type":"SSML","ssml":spokenMsg},"reprompt": {"outputSpeech": { "type": "SSML", "ssml": "<speak>Please describe your injury.</speak>" }}, "shouldEndSession":False}}
 
+        elif intentName == "ShowPhotoIntent":
+            term_to_show = event['request']['intent']['slots']['ShowTerm']['value']
+            #photo = search(term_to_show+" diagram", "images", "general").result[0]
+
+            spokenMsg = "<speak>I have sent you an image on your Alexa app. </speak>"
+            return {"version": "1.0", "response": {"outputSpeech": {"type":"SSML","ssml":spokenMsg},"card": {"type": "Standard","title": term_to_show,"text": "Here is a diagram for "+term_to_show, "image": {
+        "smallImageUrl": "https://wcs.smartdraw.com/cpr-diagram/examples/cpr-diagram.png?",
+        "largeImageUrl": "https://wcs.smartdraw.com/cpr-diagram/examples/cpr-diagram.png?"
+      } }}}
+       
+            
+
+        elif intentName == "ShowVideoIntent":
+            term_to_show = event['request']['intent']['slots']['ShowTerm']['value']
+            video = search("how to "+term_to_show, "videos", "general").result[0]
+            spokenMsg = "<speak>I have sent you a video on your Alexa app. </speak>"
+            return {"version": "1.0", "response": {"outputSpeech": {"type":"SSML","ssml":spokenMsg},"card": {"type": "Standard","title": term_to_show,"text": "Follow this link to find a video on "+term_to_show+": "+video}}}
+            
           
         elif intentName=="CategoryIntent":
             if event['request']['intent']['slots']['category']['value'] == 'thermal':
@@ -207,21 +245,21 @@ def getNextStep(event): #is also conditional No (goes to default_next)
     else:
         item = response['Item']
 
-        if int(item['Steps'][item['Current_Step']]['default_next']) == -1:
+        if int(item['Injury'][int(item['Current_Step'])]['default_next']) == -1:
             return "You have reached the end of the first aid procedure. If you need, you can start over or listen to the previous step."
         else:
 
             response = table.update_item(Key = {'User_Session':str(event['session']['user']['userId'])},
                                          UpdateExpression="set Current_Step=:c",
                                          ExpressionAttributeValues={
-                                             ':c': int(item['Steps'][item['Current_Step']]['default_next'])
+                                             ':c': int(item['Injury'][int(item['Current_Step'])]['default_next'])
                                              },
                                          ReturnValues="UPDATED_NEW")
             
             print("GetItem succeeded:")
             #print(json.dumps(item))
             
-            return item['Steps'][int(item['Steps'][item['Current_Step']]['default_next'])]["Speak"]
+            return item['Injury'][int(item['Injury'][int(item['Current_Step'])]['default_next'])]["Speak"]
 
 def getConditionalNext(event):
     dynamodb = boto3.resource('dynamodb')
@@ -235,21 +273,21 @@ def getConditionalNext(event):
     else:
         item = response['Item']
 
-        if int(item['Steps'][item['Current_Step']]['conditional_next']) == -1:
+        if int(item['Injury'][int(item['Current_Step'])]['conditional_next']) == -1:
             return getNextStep(event)
         else:
 
             response = table.update_item(Key = {'User_Session':str(event['session']['user']['userId'])},
                                          UpdateExpression="set Current_Step=:c",
                                          ExpressionAttributeValues={
-                                             ':c': int(item['Steps'][item['Current_Step']]['conditional_next'])
+                                             ':c': int(item['Injury'][int(item['Current_Step'])]['conditional_next'])
                                              },
                                          ReturnValues="UPDATED_NEW")
             
             print("GetItem succeeded:")
             #print(json.dumps(item))
             
-            return item['Steps'][int(item['Steps'][item['Current_Step']]['conditional_next'])]["Speak"]
+            return item['Injury'][int(item['Injury'][int(item['Current_Step'])]['conditional_next'])]["Speak"]
 
 def getPreviousStep(event): 
     dynamodb = boto3.resource('dynamodb')
@@ -277,7 +315,7 @@ def getPreviousStep(event):
             print("GetItem succeeded:")
             #print(json.dumps(item))
             
-            return item['Steps'][int(item['Current_Step'])-1]["Speak"]
+            return item['Injury'][int(item['Current_Step'])-1]["Speak"]
 
 def repeatStep(event):
     dynamodb = boto3.resource('dynamodb')
@@ -290,7 +328,7 @@ def repeatStep(event):
         print(e.response['Error']['Message'])
     else:
         item = response['Item']
-        return item['Steps'][int(item['Current_Step'])]["Speak"]
+        return item['Injury'][int(item['Current_Step'])]["Speak"]
 
 def startOver(event):
     dynamodb = boto3.resource('dynamodb')
@@ -310,7 +348,7 @@ def startOver(event):
                                          },
                                      ReturnValues="UPDATED_NEW")
         
-        return item['Steps'][0]["Speak"]
+        return item['Injury'][0]["Speak"]
     
 
 def getInjury(injury_text):
@@ -319,7 +357,7 @@ def getInjury(injury_text):
     try:
         response = table.get_item(
             Key={
-                "Name" : injury_text})
+                'Name': injury_text})
     except ClientError as e:
         print(e.response['Error']['Message'])
     else:
